@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-28
+
 ### Added
 
 - First version: a SunPower PVS5/PVS6 read through its local varserver API
@@ -22,4 +24,5 @@ the notes of the version's GitHub Release.
   clicks), identity of the PVS checked at every read, samples published once
   and never stale, at most 250 states a minute, test button. Read-only.
 
-[Unreleased]: https://github.com/LM1LC3N7/gladys-sunpower-pvs/commits/main
+[Unreleased]: https://github.com/LM1LC3N7/gladys-sunpower-pvs/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/LM1LC3N7/gladys-sunpower-pvs/releases/tag/v0.1.1

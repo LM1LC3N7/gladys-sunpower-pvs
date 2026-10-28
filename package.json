@@ -1,6 +1,6 @@
 {
   "name": "gladys-sunpower-pvs",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "SunPower PVS5/PVS6 for Gladys Assistant, read through the local varserver API (HTTPS, pinned certificate): production, grid and home power, the production index, micro-inverters, meters, SunVault batteries and transfer switches. Read-only.",
   "type": "module",
