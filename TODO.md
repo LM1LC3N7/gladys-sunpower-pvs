@@ -76,3 +76,11 @@
   fresh sample: a value held from /data shows in the status only then.
 - A fallback production index from the production meter when the live data
   is missing (older firmware).
+
+## Next patch
+
+- r2 m1: a 429 on the serial-number read has no test (the mutant treating it as `NO_SERIAL` survives).
+- r2 m2: a non-varserver body on the serial-number read gives `NO_SERIAL` without a test; `BAD_ANSWER`
+  ("is this a PVS?") would be more accurate.
+- r2 m3: docs fr/en: a device not yet heard publishes nothing; a serial refused with a 400 makes the status
+  ask for the password.
