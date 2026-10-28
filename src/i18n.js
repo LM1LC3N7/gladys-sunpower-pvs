@@ -257,6 +257,10 @@ export const T = {
       en: `${n} device(s) without a usable serial number: not offered.`,
       fr: `${n} appareil(s) sans numéro de série utilisable : non proposé(s).`,
     }),
+    unheard: (n) => ({
+      en: `${n} device(s) not heard yet since the PVS started (no sample): nothing published for them.`,
+      fr: `${n} appareil(s) pas encore entendu(s) depuis le démarrage de la PVS (aucun échantillon) : rien de publié pour eux.`,
+    }),
     secretId: (n) => ({
       en: `${n} device(s) whose serial number holds the password: not offered.`,
       fr: `${n} appareil(s) dont le numéro de série contient le mot de passe : non proposé(s).`,

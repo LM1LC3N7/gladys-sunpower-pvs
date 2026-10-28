@@ -97,8 +97,6 @@ export const RETRY_MAX = 30 * MINUTE;
 /** HTTP 429 or 5xx of the live data: a pause from 1 min to 6 h, kept in /data. */
 export const PAUSE_MIN = MINUTE;
 export const PAUSE_MAX = 6 * HOUR;
-/** The time of the last read is written in /data at most once per this delay. */
-export const ATTEMPT_SAVE_EVERY = MINUTE;
 /** The test button answers within this delay (the manifest gives it 30 s). */
 export const TEST_ANSWER_WITHIN = 25 * SECOND;
 /** `getConfig()` failing at a connection: tried again after 5 s, doubled up to 5 min, without end. */

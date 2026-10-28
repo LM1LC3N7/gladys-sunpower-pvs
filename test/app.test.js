@@ -20,7 +20,7 @@ import {
   json,
   live,
 } from './fixtures/pvs.js';
-import { CONFIG, D, F, HOUR, MINUTE, SECOND, created, setup } from './helpers/app.js';
+import { CONFIG, D, F, HOUR, MINUTE, SECOND, created, setup, until } from './helpers/app.js';
 
 const SITE_DEVICES = () => [created('site')];
 const text = (status) => status?.message?.en ?? '';
@@ -705,7 +705,7 @@ test('a late answer of an old session publishes nothing and sets no status', asy
       : undefined;
   await t.app.start(CONFIG);
   const running = t.advance(0);
-  while (!release) await new Promise((resolve) => setImmediate(resolve));
+  await until(() => release);
   t.pvs.hook = undefined;
   // The address changes while the old read waits for its answer.
   await t.app.configUpdated({ address: '192.168.1.21' });
@@ -850,14 +850,32 @@ test('stop: /data written at once, before waiting for the read running', async (
   t.pvs.hook = (path) =>
     path.startsWith('/vars?name=/sys/livedata') ? new Promise(() => {}) : undefined;
   const reading = t.advance(POLL_INTERVAL);
-  while (t.pvs.count('/vars?name=/sys/livedata') < 2) await new Promise((r) => setImmediate(r));
-  assert.equal(store.data.lastAttemptAt, NOW, 'the attempt at 30 s is not saved yet');
+  await until(() => t.pvs.count('/vars?name=/sys/livedata') >= 2);
+  // Something new in memory while the read hangs (seen, not saved yet).
+  t.app.memory.seen['inverter-E00987654321999'] = { kind: 'inverter', keys: ['power'] };
   const stopping = t.app.stop();
-  for (let i = 0; i < 20; i += 1) await new Promise((r) => setImmediate(r));
-  assert.ok(store.data.lastAttemptAt > NOW + POLL_INTERVAL - SECOND);
+  await until(() => store.data.seen['inverter-E00987654321999']);
   await t.advance(10 * SECOND);
   await stopping;
   void reading;
+});
+
+test('killed during a request: the time of that read is already in /data', async () => {
+  const store = createMemoryStore();
+  const t = await setup({ store });
+  await t.start();
+  t.pvs.hook = (path) =>
+    path.startsWith('/vars?name=/sys/livedata') ? new Promise(() => {}) : undefined;
+  void t.advance(POLL_INTERVAL);
+  await until(() => t.pvs.count('/vars?name=/sys/livedata') >= 2);
+  assert.ok(store.data.lastAttemptAt > NOW + POLL_INTERVAL - SECOND);
+  // A new process (the old one is gone without a stop): no read before 30 s.
+  const t2 = await setup({ store, now: t.clock.now + SECOND });
+  await t2.start();
+  assert.equal(t2.pvs.count('/vars?name=/sys/livedata'), 0);
+  await t2.wait(POLL_INTERVAL);
+  assert.equal(t2.pvs.count('/vars?name=/sys/livedata'), 1);
+  await t2.app.stop();
 });
 
 test('no battery listed: no battery feature, even with a battery power of 0 in the live data', async () => {
@@ -870,5 +888,131 @@ test('no battery listed: no battery feature, even with a battery power of 0 in t
   const site = t.gladys.fake.discoveredDevices.find((d) => d.external_id === D('site'));
   const keys = site.features.map((f) => f.external_id.split(':').at(-1));
   assert.ok(!keys.includes('battery_power') && !keys.includes('backup_time'));
+  await t.app.stop();
+});
+
+// --- Review r1 -----------------------------------------------------------------------------
+
+const acceptTwice = async (t) => {
+  await t.app.acceptHeld();
+  await t.wait(5 * SECOND);
+  return t.app.acceptHeld();
+};
+
+test('r1 I1: a drop accepted is a floor: a lower value afterwards is held, never published', async () => {
+  const t = await setup({ devices: SITE_DEVICES() });
+  await t.start();
+  setPv(t, 10);
+  await t.wait(MINUTE);
+  assert.match((await acceptTwice(t)).en, /Accepted/);
+  setPv(t, 5);
+  await t.wait(MINUTE);
+  assert.deepEqual(t.statesOf('site', 'production_index'), [11992.03]);
+  assert.match(text(t.gladys.fake.connectionStatus), /dropped from 11992.03 to 5 kWh/);
+  await t.app.stop();
+});
+
+test('r1 I1: a jump accepted is a floor too: a lower value afterwards is held', async () => {
+  const t = await setup({ devices: SITE_DEVICES() });
+  await t.start();
+  setPv(t, 20000);
+  await t.wait(MINUTE);
+  await acceptTwice(t);
+  setPv(t, 15000);
+  await t.wait(MINUTE);
+  assert.deepEqual(t.statesOf('site', 'production_index'), [11992.03]);
+  assert.match(text(t.gladys.fake.connectionStatus), /11992.03 to 15000 kWh/);
+  await t.app.stop();
+});
+
+test('r1 I2: the serial number refused by a 400 (fcgi_vars): the status asks for the password', async () => {
+  const t = await setup();
+  t.pvs.serialPublic = false;
+  await t.start();
+  assert.equal(t.pvs.requests[0].path, '/vars?name=/sys/info/serialnum');
+  assert.match(
+    text(t.gladys.fake.connectionStatus),
+    /does not give its serial number: type the password/,
+  );
+  await t.app.stop();
+});
+
+test('r1 I3: a device never heard (msmtEps n/a, fields at 0) publishes nothing, offers nothing', async () => {
+  const t = await setup({ devices: [created('inverter-E00987654321001')] });
+  t.pvs.devices.inverter = [
+    inverter('E00987654321001', NOW, {
+      msmtEps: 'n/a',
+      p3phsumKw: 0,
+      i3phsumA: 0,
+      tHtsnkDegc: 0,
+      pMppt1Kw: 0,
+      vMppt1V: 0,
+      iMppt1A: 0,
+      ltea3phsumKwh: 0,
+    }),
+    inverter('E00987654321002', NOW, { msmtEps: 'n/a' }),
+  ];
+  await t.start();
+  await t.wait(5 * MINUTE);
+  assert.equal(
+    t.gladys.fake.states.filter((s) => s.device_feature_external_id.includes('inverter-')).length,
+    0,
+  );
+  assert.ok(
+    !t.gladys.fake.discoveredDevices.some((d) => d.external_id === D('inverter-E00987654321002')),
+  );
+  assert.match(text(t.gladys.fake.connectionStatus), /2 device\(s\) not heard yet/);
+  await t.app.stop();
+});
+
+test('r1 m2: 150 micro-inverters with new samples every 5 min: every one published in turn', async () => {
+  const sns = Array.from({ length: 150 }, (_, i) => `E0098765432${String(i).padStart(4, '0')}`);
+  const t = await setup({ devices: sns.map((sn) => created(`inverter-${sn}`)) });
+  const refresh = (at) => {
+    t.pvs.devices.inverter = sns.map((sn, i) => inverter(sn, at, { p3phsumKw: 0.2 + i / 10_000 }));
+  };
+  refresh(NOW);
+  await t.start();
+  for (let k = 1; k <= 3; k += 1) {
+    refresh(NOW + k * 5 * MINUTE);
+    await t.wait(5 * MINUTE);
+  }
+  const sent = new Set(
+    t.gladys.fake.states
+      .filter((s) => s.device_feature_external_id.endsWith(':power'))
+      .map((s) => s.device_feature_external_id),
+  );
+  assert.equal(sent.size, 150);
+  await t.app.stop();
+});
+
+test('r1 m6: the serial number is read once per client, not at each new session', async () => {
+  const t = await setup();
+  await t.start();
+  t.pvs.expire();
+  await t.wait(POLL_INTERVAL);
+  t.pvs.expire();
+  await t.wait(POLL_INTERVAL);
+  assert.equal(t.pvs.count('/auth?login'), 3);
+  assert.equal(t.pvs.requests.filter((r) => r.path.includes('serialnum')).length, 1);
+  await t.app.stop();
+});
+
+test('r1 m6: a sample dated more than 2 h in the future of the PVS clock is not published', async () => {
+  const t = await setup({ devices: [created('inverter-E00987654321001')] });
+  t.pvs.devices.inverter = [inverter('E00987654321001', NOW + 3 * HOUR)];
+  await t.start();
+  assert.deepEqual(t.statesOf('inverter-E00987654321001', 'power'), []);
+  await t.app.stop();
+});
+
+test('r1 m6: the counters of the site go once a minute, not at every read', async () => {
+  const t = await setup({ devices: SITE_DEVICES() });
+  await t.start();
+  for (let i = 1; i <= 4; i += 1) {
+    setPv(t, 11992.03 + i * 0.01);
+    await t.wait(POLL_INTERVAL);
+  }
+  assert.equal(t.statesOf('site', 'production_index').length, 3);
   await t.app.stop();
 });

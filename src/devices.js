@@ -20,8 +20,10 @@
 //   declared here (ids computed, UUID v5: an "Update" in Discovery keeps the
 //   same rows; the integration never publishes that one);
 // - NO `energy-sensor` / `index`, no `daily-consumption`, never
-//   publishEnergyConsumption: what the home draws and buys is counted by the
-//   utility meter; counted twice, it would be billed twice. Every other
+//   publishEnergyConsumption: what the consumption meter of the PVS measures
+//   depends on where its sensors are installed and its signs are not
+//   documented (a wrong index skews the monitoring silently), and a home whose
+//   grid meter already reaches Gladys would count it twice. Every other
 //   lifetime counter (home consumption, bought, sold, a micro-inverter, a
 //   meter) is a plain sensor, kWh in the name;
 // - every lifetime counter (the index and the plain ones) goes through the

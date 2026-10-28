@@ -48,7 +48,6 @@ import { addressOf, isComplete, normalizeConfig, targetKey } from './config.js';
 import {
   ACCEPT_CONFIRM_AFTER,
   ACCEPT_CONFIRM_WITHIN,
-  ATTEMPT_SAVE_EVERY,
   CONFIG_RETRY_MAX,
   CONFIG_RETRY_MIN,
   DATED_AFTER,
@@ -751,9 +750,17 @@ export class SunPowerApp {
     const devices = [];
     let unnamed = 0;
     let secret = 0;
+    let unheard = 0;
     const roles = new Set();
     for (const { index, fields } of raw) {
       const sample = PARSERS[kind](fields);
+      // No readable `msmtEps`: the device was never heard since the PVS
+      // started; its fields are defaults (0), never measurements nor
+      // capabilities (review r1, I3).
+      if (sample.at === undefined) {
+        unheard += 1;
+        continue;
+      }
       let platformId;
       if (kind === 'meter') {
         const role = sample.role && !roles.has(sample.role) ? sample.role : undefined;
@@ -775,19 +782,15 @@ export class SunPowerApp {
         sample,
       });
     }
-    return { devices, unnamed, secret };
+    return { devices, unnamed, secret, unheard };
   }
 
   async saveAttempt(now) {
+    // Written before every request (review r1, m1): a process killed during
+    // it never reads again sooner than the interval after a restart.
     this.lastAttemptAt = now;
-    if (
-      this.savedAttemptAt === undefined ||
-      now < this.savedAttemptAt ||
-      now - this.savedAttemptAt >= ATTEMPT_SAVE_EVERY
-    ) {
-      this.savedAttemptAt = now;
-      await this.saveState();
-    }
+    this.savedAttemptAt = now;
+    await this.saveState();
   }
 
   // --- Outcomes ----------------------------------------------------------------
@@ -882,7 +885,13 @@ export class SunPowerApp {
     for (const kind of DEVICE_KINDS) {
       list.push(...(this.kinds[kind].devices ?? []));
     }
-    return list.sort((a, b) => PRIORITY[a.entry.kind] - PRIORITY[b.entry.kind]);
+    // Within a kind, the device published longest ago first: a site with more
+    // micro-inverters than the budget of a minute sends them all in turn
+    // (review r1, m2).
+    const last = (s) => this.memory.samples[s.entry.platformId] ?? 0;
+    return list.sort(
+      (a, b) => PRIORITY[a.entry.kind] - PRIORITY[b.entry.kind] || last(a) - last(b),
+    );
   }
 
   /** The feature keys seen, from the samples of this read; whether a key is new. */
@@ -1401,6 +1410,8 @@ export class SunPowerApp {
       if (failing.length > 0) extra.push(T.notes.kindsFailed(failing));
       const unnamed = DEVICE_KINDS.reduce((n, k) => n + (this.kinds[k].unnamed ?? 0), 0);
       if (unnamed > 0) extra.push(T.notes.unnamed(unnamed));
+      const unheard = DEVICE_KINDS.reduce((n, k) => n + (this.kinds[k].unheard ?? 0), 0);
+      if (unheard > 0) extra.push(T.notes.unheard(unheard));
       const secret = DEVICE_KINDS.reduce((n, k) => n + (this.kinds[k].secret ?? 0), 0);
       if (secret > 0) extra.push(T.notes.secretId(secret));
       const more = DEVICE_KINDS.filter((k) => this.kinds[k].more);

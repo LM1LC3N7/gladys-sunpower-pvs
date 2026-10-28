@@ -62,10 +62,16 @@ Then open the **Discover** tab and create the devices you want.
 - **Each transfer switch** (MIDC): grid relay closed (1) or open (0),
   temperature, grid voltages.
 
-Only the production index of the site is in the energy monitoring. What the
-home draws or buys from the grid is counted by your utility meter: counted
-here too, it would be billed twice. The other totals are plain sensors, the
-unit in their name.
+Only the production index of the site is in the energy monitoring: with this
+integration alone, the consumption of the home does not show there. The
+totals bought from and sold to the grid and the home consumption are plain
+sensors (the unit in their name), because: what the consumption meter of the
+PVS measures depends on where its sensors are installed (at the grid
+connection or on the home's circuits) and the signs are not documented, so
+as an index a wrong guess would skew the monitoring without a warning; and a
+home that already sends its grid meter to Gladys (another integration) would
+count it twice. Making "bought from the grid" a consumption index is an
+option for later, once checked on a real PVS.
 
 ## Lifetime counters: the guard
 
@@ -118,7 +124,8 @@ clock set by the network (NTP) does not widen nor narrow its margin.
 - One PVS per integration.
 - The local API is new: SunStrong says the list of variables may change.
 - At most 200 micro-inverters, 8 meters, 8 batteries, 4 transfer switches;
-  the integration sends at most 250 values a minute to Gladys (a large site
-  gets its micro-inverter samples over a few minutes).
+  the integration sends at most 250 values a minute to Gladys: beyond about
+  130 micro-inverters, they are sent in turn (the one sent longest ago
+  first), so each one gets a value every 10 to 15 minutes instead of 5.
 - The signs of the battery and meter powers are the PVS's own (not checked
   on a real system).

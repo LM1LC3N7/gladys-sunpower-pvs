@@ -42,6 +42,9 @@ test('real clock x20 over HTTPS: reads at 0, the interval and twice the interval
     await app.idle();
     await app.stop();
   } finally {
+    // A failure (a regression that slows the reads) still stops the app: its
+    // timers never keep the runner alive (review r1, I4).
+    await app.stop().catch(() => {});
     clock.close();
   }
   const reads = srv.received.filter((r) => r.path.startsWith('/vars?name=/sys/livedata')).length;

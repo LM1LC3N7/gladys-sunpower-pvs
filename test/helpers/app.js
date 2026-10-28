@@ -5,6 +5,7 @@
 // (`wall.offset`: NTP setting the clock).
 // -----------------------------------------------------------------------------
 
+import assert from 'node:assert/strict';
 import { createFakeGladys } from '@gladysassistant/integration-sdk/testing';
 import { SunPowerApp } from '../../src/app.js';
 import { CATALOG, buildDevice } from '../../src/devices.js';
@@ -19,6 +20,18 @@ export const HOUR = 60 * MINUTE;
 export const D = (platformId) => `ext:${SELECTOR}:pvs:${platformId}`;
 export const F = (platformId, key) => `${D(platformId)}:${key}`;
 export const CONFIG = { address: HOST };
+
+/**
+ * Waits (real time, bounded) for `check()` to be true: a regression fails the
+ * test within 5 s, never spins the runner without end (review r1, I4).
+ */
+export async function until(check, ms = 5000) {
+  const end = performance.now() + ms;
+  while (!check()) {
+    if (performance.now() > end) assert.fail(`condition not met within ${ms} ms`);
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  }
+}
 
 const KIND = {
   site: 'site',

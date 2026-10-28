@@ -70,10 +70,17 @@ Ouvrez ensuite l'onglet **Découverte** et créez les appareils voulus.
 - **Chaque commutateur de transfert** (MIDC) : relais réseau fermé (1) ou
   ouvert (0), température, tensions du réseau.
 
-Seul l'index de production du site entre dans le suivi énergétique. Ce que
-la maison consomme ou achète au réseau est compté par votre compteur
-d'électricité : compté ici aussi, il serait facturé deux fois. Les autres
-totaux sont de simples capteurs, l'unité dans leur nom.
+Seul l'index de production du site entre dans le suivi énergétique : avec
+cette seule intégration, la consommation de la maison n'y apparaît pas. Les
+totaux achetés et vendus au réseau et la consommation de la maison sont de
+simples capteurs (l'unité dans leur nom), car : ce que mesure le compteur de
+consommation de la PVS dépend de la pose de ses capteurs (au raccordement au
+réseau ou sur les circuits de la maison) et les signes ne sont pas
+documentés, donc en index une erreur fausserait le suivi sans alerte ; et
+une maison qui envoie déjà son compteur réseau à Gladys (autre intégration)
+le compterait deux fois. Faire de « acheté au réseau » un index de
+consommation est une option pour plus tard, une fois vérifié sur une vraie
+PVS.
 
 ## Compteurs cumulés : la garde
 
@@ -134,8 +141,9 @@ marge.
 - L'API locale est récente : SunStrong prévient que la liste des variables
   peut changer.
 - Au plus 200 micro-onduleurs, 8 compteurs, 8 batteries, 4 commutateurs de
-  transfert ; l'intégration envoie au plus 250 valeurs par minute à Gladys
-  (un grand site reçoit les échantillons de ses micro-onduleurs en quelques
-  minutes).
+  transfert ; l'intégration envoie au plus 250 valeurs par minute à Gladys :
+  au-delà d'environ 130 micro-onduleurs, ils sont envoyés à tour de rôle (le
+  plus anciennement envoyé d'abord), chacun recevant une valeur toutes les 10
+  à 15 minutes au lieu de 5.
 - Les signes des puissances de la batterie et des compteurs sont ceux de la
   PVS (non vérifiés sur une vraie installation).

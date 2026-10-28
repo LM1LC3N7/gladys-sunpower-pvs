@@ -69,7 +69,8 @@ test/helpers/server.js            the fake PVS behind a real HTTPS server; a TLS
   (`energy-production-sensor` / `index`, `/sys/livedata/pv_en`, kWh), with
   its `production_index_30min` declared (UUID v5 ids, the core fills it).
   Never an `energy-sensor` / `index`, never `publishEnergyConsumption`: the
-  home and the grid are counted by the utility meter. Every other lifetime
+  consumption meter's placement and signs are undocumented, and another
+  integration may already count the grid (TODO.md "Decisions"). Every other lifetime
   counter is a plain sensor, kWh in the name. Every lifetime counter passes
   `IndexGuard` (`src/guard.js`, 200 kW for the site and the meters, 2 kW for
   a micro-inverter): never 0, a drop and a jump never confirmed by repetition

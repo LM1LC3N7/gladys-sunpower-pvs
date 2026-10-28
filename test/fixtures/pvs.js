@@ -237,19 +237,35 @@ export function createPvs({ clock = { now: NOW }, password = PASSWORD } = {}) {
         { ...date, 'set-cookie': [`session=${token}; HttpOnly`] },
       );
     }
-    const query = /^\/vars\?(name|match)=(.*)$/.exec(path);
-    if (!query) return json(404, 'Not found', date);
+    // As fcgi_vars (github.com/tjmonk/fcgi_vars, src/fcgi_vars.c): the raw
+    // query split on '&', `name=` on ',', `match=` a substring; a cookie that
+    // is not a session -> 401; no cookie -> the unauthenticated user (the
+    // serial number only, when `serialPublic`); nothing found -> 400.
+    if (!path.startsWith('/vars?')) return json(404, 'Not found', date);
     const cookie = /^session=(.*)$/.exec(String(headers.cookie ?? ''))?.[1];
-    const authed = cookie && pvs.sessions.has(cookie);
-    if (!authed) {
-      if (pvs.serialPublic && query[1] === 'name' && query[2] === '/sys/info/serialnum') {
-        return json(200, values(['/sys/info/serialnum']), date);
-      }
-      return json(401, 'Unauthorized', date);
+    if (cookie !== undefined && !pvs.sessions.has(cookie)) {
+      return json(401, { status: 401, description: 'Unauthorized' }, date);
     }
-    if (query[1] === 'name') return json(200, values(query[2].split(',')), date);
+    const user = cookie !== undefined;
     const all = pvs.vars();
-    return json(200, values(Object.keys(all).filter((n) => n.startsWith(query[2]))), date);
+    const allowed = (name) => user || (pvs.serialPublic && name === '/sys/info/serialnum');
+    const found = [];
+    for (const token of path.slice('/vars?'.length).split('&')) {
+      if (token.startsWith('name=')) {
+        for (const name of token.slice(5).split(',')) {
+          if (name in all && allowed(name)) found.push(name);
+        }
+      } else if (token.startsWith('match=')) {
+        const sub = token.slice(6);
+        for (const name of Object.keys(all)) {
+          if (name.includes(sub) && allowed(name)) found.push(name);
+        }
+      }
+    }
+    if (found.length === 0) {
+      return json(400, { status: 400, description: 'Bad request', errorcode: '0x0000' }, date);
+    }
+    return json(200, values(found), date);
   };
   return pvs;
 }

@@ -120,9 +120,11 @@ export class IndexGuard {
 
   /** Whether `value` is within the acceptance: the value shown, plus the margin since. */
   withinAccepted(value, at) {
-    const { direction, to, at: since } = this.accepted;
+    const { to, at: since } = this.accepted;
     const top = to + this.margin(since, at);
-    return direction === 'up' ? value >= to && value <= top : value <= top;
+    // Both ways a floor: a value below the one accepted is not what the user
+    // saw (review r1 of gladys-sunpower-pvs, I1; as gladys-resol).
+    return value >= to && value <= top;
   }
 
   /** Whether `value`, read at `at`, may be published. A published value becomes the reference. */

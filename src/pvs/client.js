@@ -197,13 +197,21 @@ export class PvsClient {
       maxBytes: SMALL_BYTES,
       timeout,
     });
-    if (res.status === 401 || res.status === 403) {
+    // fcgi_vars answers 400 when the user may read none of the variables
+    // asked (401 only for an invalid cookie): any 4xx but 429 means the PVS
+    // does not give its serial number without a session (review r1, I2).
+    if (res.status >= 400 && res.status < 500 && res.status !== 429) {
       throw new PvsError(CODES.NO_SERIAL, `Serial number refused without a session`, {
         status: res.status,
       });
     }
     if (res.status !== 200) throw PvsClient.failure(res, 'Serial number');
-    const value = parseVars(res.body).get(VAR_SERIAL);
+    let value;
+    try {
+      value = parseVars(res.body).get(VAR_SERIAL);
+    } catch {
+      value = undefined;
+    }
     const serial = typeof value === 'string' ? value.trim() : '';
     if (!SERIAL.test(serial)) {
       throw new PvsError(CODES.NO_SERIAL, 'No serial number in the answer');
